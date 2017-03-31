@@ -24,25 +24,35 @@
  */
 package com.google.chkstream.function;
 
-/**
- * Represents an operation that accepts a single input argument and returns no
- * result. Unlike most other functional interfaces, {@code Consumer} is expected
- * to operate via side-effects.
- *
- * <p>This is a <a href="package-summary.html">functional interface</a>
- * whose functional method is {@link #accept(Object)}.
- *
- * @param <T> the type of the input to the operation
- *
- * @since 1.8
- */
-@FunctionalInterface
-public interface ChkConsumer<T, E0 extends Exception> {
+public final class ChkConsumer {
+  private ChkConsumer() {}
 
+  % for num_e in xrange(MIN_EXCEPTIONS, MAX_EXCEPTIONS  + 1):
+  <%
+    exc_decl_list = ', ' + ', '.join(
+        ['E%d extends Exception' % i for i in xrange(0, num_e)])
+    throws_list = 'throws ' + ', '.join(['E%d' % i for i in xrange(0, num_e)])
+  %>
+
+  /**
+   * Represents an operation that accepts a single input argument and returns no
+   * result. Unlike most other functional interfaces, {@code Consumer} is expected
+   * to operate via side-effects.
+   *
+   * <p>This is a <a href="package-summary.html">functional interface</a>
+   * whose functional method is {@link #accept(Object)}.
+   *
+   * @param <T> the type of the input to the operation
+   */
+  public static interface ChkConsumer_Throw${num_e}
+  <T${exc_decl_list}>
+  {
     /**
      * Performs this operation on the given argument.
      *
      * @param t the input argument
      */
-    void accept(T t) throws E0;
+    void accept(T t) ${throws_list};
+  }
+  % endfor
 }

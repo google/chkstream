@@ -22,7 +22,20 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-package com.google.chkstream.java8;
+
+<%
+  exc_decl_list = ', ' + ', '.join(
+      ['E%d extends Exception' % i for i in xrange(0, num_e)])
+  exc_use_list = ', ' + ', '.join(['E%d' % i for i in xrange(0, num_e)])
+  exc_extend_list = ', ' + ', '.join(
+      ['? extends E%d' % i for i in xrange(0, num_e)])
+  throws_list = 'throws ' + ', '.join(['E%d' % i for i in xrange(0, num_e)])
+%>
+<%def name="class_type(contained_type)">\
+${class_name}<${contained_type}${exc_use_list}>\
+</%def>
+
+package com.google.chkstream.${flavour};
 
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -48,10 +61,10 @@ import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
 import com.google.chkstream.ChkStreamWrappedException;
-import com.google.chkstream.function.ChkConsumer;
-import com.google.chkstream.function.ChkFunction;
-import com.google.chkstream.function.ChkPredicate;
-import com.google.chkstream.function.ChkRunnable;
+import com.google.chkstream.function.ChkConsumer.ChkConsumer_Throw${num_e};
+import com.google.chkstream.function.ChkFunction.ChkFunction_Throw${num_e};
+import com.google.chkstream.function.ChkPredicate.ChkPredicate_Throw${num_e};
+import com.google.chkstream.function.ChkRunnable.ChkRunnable_Throw${num_e};
 
 /**
  * A sequence of elements supporting sequential and parallel aggregate
@@ -155,13 +168,22 @@ import com.google.chkstream.function.ChkRunnable;
  * @see DoubleStream
  * @see <a href="package-summary.html">java.util.stream</a>
  */
-public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
+public class ${class_name}<T${exc_decl_list}>
+    implements AutoCloseable {
     private final Stream<T> stream;
-    private final Class<E0> e0Class;
+    % for i in xrange(0, num_e):
+    private final Class<E${i}> e${i}Class;
+    % endfor
 
-    ChkStream(Class<E0> e0Class, Stream<T> stream) {
-        this.stream = stream;
-        this.e0Class = e0Class;
+    ${class_name}(
+        % for i in xrange(0, num_e):
+        Class<E${i}> e${i}Class,
+        % endfor,
+        Stream<T> stream) {
+      this.stream = stream;
+      % for i in xrange(0, num_e):
+      this.e${i}Class = e${i}Class;
+      % endfor
     }
 
     // Methods from BaseStream.
@@ -211,7 +233,7 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      *
      * @return a sequential stream
      */
-    public ChkStream<T, E0> sequential() {
+    public ${class_type('T')} sequential() {
         return fromStream(stream.sequential());
     }
 
@@ -225,7 +247,7 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      *
      * @return a parallel stream
      */
-    public ChkStream<T, E0> parallel() {
+    public ${class_type('T')} parallel() {
         return fromStream(stream.parallel());
     }
 
@@ -240,7 +262,7 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      *
      * @return an unordered stream
      */
-    public ChkStream<T, E0> unordered() {
+    public ${class_type('T')} unordered() {
         return fromStream(stream.unordered());
     }
 
@@ -262,7 +284,10 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      * @param closeHandler A task to execute when the stream is closed
      * @return a stream with a handler that is run if the stream is closed
      */
-    public ChkStream<T, E0> onClose(ChkRunnable<? extends E0> closeHandler) {
+    public ${class_type('T')} onClose(
+        ChkRunnable_Throw${num_e}
+            <${', '.join(['? extends E%d' % i for i in xrange(0, num_e)])}>
+            closeHandler) {
         return fromStream(stream.onClose(() -> {
             try {
                 closeHandler.run();
@@ -279,7 +304,7 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      * @see AutoCloseable#close()
      */
     @Override
-    public void close() throws E0 {
+    public void close() ${throws_list} {
         try {
             stream.close();
         } catch (ChkStreamWrappedException e) {
@@ -300,8 +325,10 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      *                  should be included
      * @return the new stream
      */
-    public ChkStream<T, E0> filter(
-            ChkPredicate<? super T, ? extends E0> predicate) {
+    public ${class_type('T')} filter(
+        ChkPredicate_Throw${num_e}
+            <? super T${exc_extend_list}>
+                predicate) {
         return fromStream(stream.filter(t -> {
             try {
                 return predicate.test(t);
@@ -324,8 +351,11 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      *               function to apply to each element
      * @return the new stream
      */
-    public <R> ChkStream<R, E0> map(
-            ChkFunction<? super T, ? extends R, ? extends E0> mapper) {
+    public <R> ${class_type('R')} map(
+        ChkFunction_Throw${num_e}
+            <? super T,
+             ? extends R${exc_extend_list}>
+                mapper) {
         return fromStream(stream.map(t -> {
             try {
                 return mapper.apply(t);
@@ -377,12 +407,12 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      *               of new values
      * @return the new stream
      */
-    public <R> ChkStream<R, E0> flatMap(
-            ChkFunction
+    public <R> ${class_type('R')} flatMap(
+        ChkFunction_Throw${num_e}
             <? super T,
-             ? extends Stream<? extends R>,
-             ? extends E0>
-            mapper) {
+             ? extends Stream<? extends R>
+             ${exc_extend_list}>
+                mapper) {
         return fromStream(stream.flatMap(t -> {
             Stream<? extends R> subStream;
             try {
@@ -436,14 +466,14 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      *               of new values
      * @return the new stream
      */
-    public <R> ChkStream<R, E0> flatMapToChkStream(
-            ChkFunction
+    public <R> ${class_type('R')} flatMapToChkStream(
+        ChkFunction_Throw${num_e}
             <? super T,
-             ? extends ChkStream<? extends R, ? extends E0>,
-             ? extends E0>
-            mapper) {
+             ? extends ${class_name}<? extends R${exc_extend_list}>
+             ${exc_extend_list}>
+                mapper) {
         return fromStream(stream.flatMap(t -> {
-            ChkStream<? extends R, ? extends E0> subStream;
+            ${class_name}<? extends R${exc_extend_list}> subStream;
             try {
                 subStream = mapper.apply(t);
             } catch (Exception e) {
@@ -480,7 +510,7 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      *
      * @return the new stream
      */
-    public ChkStream<T, E0> distinct() {
+    public ${class_type('T')} distinct() {
         return fromStream(stream.distinct());
     }
 
@@ -498,7 +528,7 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      *
      * @return the new stream
      */
-    public ChkStream<T, E0> sorted() {
+    public ${class_type('T')} sorted() {
         return fromStream(stream.sorted());
     }
 
@@ -517,7 +547,7 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      *                   {@code Comparator} to be used to compare stream elements
      * @return the new stream
      */
-    public ChkStream<T, E0> sorted(Comparator<? super T> comparator) {
+    public ${class_type('T')} sorted(Comparator<? super T> comparator) {
         return fromStream(stream.sorted(comparator));
     }
 
@@ -550,7 +580,9 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      *                 they are consumed from the stream
      * @return the new stream
      */
-    public ChkStream<T, E0> peek(ChkConsumer<? super T, ? extends E0> action) {
+    public ${class_type('T')} peek(
+        ChkConsumer_Throw${num_e}<? super T${exc_extend_list}>
+            action) {
         return fromStream(stream.peek(t -> {
             try {
                 action.accept(t);
@@ -585,7 +617,7 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      * @return the new stream
      * @throws IllegalArgumentException if {@code maxSize} is negative
      */
-    public ChkStream<T, E0> limit(long maxSize) {
+    public ${class_type('T')} limit(long maxSize) {
         return fromStream(stream.limit(maxSize));
     }
 
@@ -616,7 +648,7 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      * @return the new stream
      * @throws IllegalArgumentException if {@code n} is negative
      */
-    public ChkStream<T, E0> skip(long n) {
+    public ${class_type('T')} skip(long n) {
         return fromStream(stream.skip(n));
     }
 
@@ -637,7 +669,9 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      * @param action a <a href="package-summary.html#NonInterference">
      *               non-interfering</a> action to perform on the elements
      */
-    public void forEach(ChkConsumer<? super T, ? extends E0> action) throws E0 {
+    public void forEach(
+        ChkConsumer_Throw${num_e}<? super T${exc_extend_list}>
+            action) ${throws_list} {
         try {
             stream.forEach(t -> {
                 try {
@@ -668,8 +702,9 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      *               non-interfering</a> action to perform on the elements
      * @see #forEach(Consumer)
      */
-    public void forEachOrdered(ChkConsumer<? super T, ? extends E0> action)
-            throws E0 {
+    public void forEachOrdered(
+        ChkConsumer_Throw${num_e}<? super T${exc_extend_list}>
+            action) ${throws_list} {
         try {
             stream.forEachOrdered(t -> {
                 try {
@@ -691,7 +726,7 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      *
      * @return an array containing the elements of this stream
      */
-    public Object[] toArray() throws E0 {
+    public Object[] toArray() ${throws_list} {
         try {
             return stream.toArray();
         } catch (ChkStreamWrappedException e) {
@@ -727,7 +762,7 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      * from the array generator is not a supertype of the runtime type of every
      * element in this stream
      */
-    public <A> A[] toArray(IntFunction<A[]> generator) throws E0 {
+    public <A> A[] toArray(IntFunction<A[]> generator) ${throws_list} {
         try {
             return stream.toArray(generator);
         } catch (ChkStreamWrappedException e) {
@@ -785,7 +820,7 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      *                    function for combining two values
      * @return the result of the reduction
      */
-    public T reduce(T identity, BinaryOperator<T> accumulator) throws E0 {
+    public T reduce(T identity, BinaryOperator<T> accumulator) ${throws_list} {
         try {
             return stream.reduce(identity, accumulator);
         } catch (ChkStreamWrappedException e) {
@@ -832,7 +867,7 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      * @see #min(Comparator)
      * @see #max(Comparator)
      */
-    public Optional<T> reduce(BinaryOperator<T> accumulator) throws E0 {
+    public Optional<T> reduce(BinaryOperator<T> accumulator) ${throws_list} {
         try {
             return stream.reduce(accumulator);
         } catch (ChkStreamWrappedException e) {
@@ -890,7 +925,7 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      */
     public <U> U reduce(U identity,
                  BiFunction<U, ? super T, U> accumulator,
-                 BinaryOperator<U> combiner) throws E0 {
+                 BinaryOperator<U> combiner) ${throws_list} {
         try {
             return stream.reduce(identity, accumulator, combiner);
         } catch (ChkStreamWrappedException e) {
@@ -952,7 +987,7 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      */
     public <R> R collect(Supplier<R> supplier,
                   BiConsumer<R, ? super T> accumulator,
-                  BiConsumer<R, R> combiner) throws E0 {
+                  BiConsumer<R, R> combiner) ${throws_list} {
         try {
             return stream.collect(supplier, accumulator, combiner);
         } catch (ChkStreamWrappedException e) {
@@ -1013,7 +1048,7 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      * @see #collect(Supplier, BiConsumer, BiConsumer)
      * @see Collectors
      */
-    public <R, A> R collect(Collector<? super T, A, R> collector) throws E0 {
+    public <R, A> R collect(Collector<? super T, A, R> collector) ${throws_list} {
         try {
             return stream.collect(collector);
         } catch (ChkStreamWrappedException e) {
@@ -1036,7 +1071,7 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      * or an empty {@code Optional} if the stream is empty
      * @throws NullPointerException if the minimum element is null
      */
-    public Optional<T> min(Comparator<? super T> comparator) throws E0 {
+    public Optional<T> min(Comparator<? super T> comparator) ${throws_list} {
         try {
             return stream.min(comparator);
         } catch (ChkStreamWrappedException e) {
@@ -1060,7 +1095,7 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      * or an empty {@code Optional} if the stream is empty
      * @throws NullPointerException if the maximum element is null
      */
-    public Optional<T> max(Comparator<? super T> comparator) throws E0 {
+    public Optional<T> max(Comparator<? super T> comparator) ${throws_list} {
         try {
             return stream.max(comparator);
         } catch (ChkStreamWrappedException e) {
@@ -1081,7 +1116,7 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      *
      * @return the count of elements in this stream
      */
-    public long count() throws E0 {
+    public long count() ${throws_list} {
         try {
             return stream.count();
         } catch (ChkStreamWrappedException e) {
@@ -1109,8 +1144,9 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      * @return {@code true} if any elements of the stream match the provided
      * predicate, otherwise {@code false}
      */
-    public boolean anyMatch(ChkPredicate<? super T, ? extends E0> predicate)
-            throws E0 {
+    public boolean anyMatch(
+        ChkPredicate_Throw${num_e}<? super T${exc_extend_list}>
+            predicate) ${throws_list} {
         try {
             return stream.anyMatch(t -> {
                 try {
@@ -1146,8 +1182,9 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      * @return {@code true} if either all elements of the stream match the
      * provided predicate or the stream is empty, otherwise {@code false}
      */
-    public boolean allMatch(ChkPredicate<? super T, ? extends E0> predicate)
-            throws E0 {
+    public boolean allMatch(
+        ChkPredicate_Throw${num_e}<? super T${exc_extend_list}>
+            predicate) ${throws_list} {
         try {
             return stream.allMatch(t -> {
                 try {
@@ -1183,8 +1220,9 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      * @return {@code true} if either no elements of the stream match the
      * provided predicate or the stream is empty, otherwise {@code false}
      */
-    public boolean noneMatch(ChkPredicate<? super T, ? extends E0> predicate)
-            throws E0 {
+    public boolean noneMatch(
+        ChkPredicate_Throw${num_e}<? super T${exc_extend_list}>
+            predicate) ${throws_list} {
         try {
             return stream.noneMatch(t -> {
                 try {
@@ -1211,7 +1249,7 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      * or an empty {@code Optional} if the stream is empty
      * @throws NullPointerException if the element selected is null
      */
-    public Optional<T> findFirst() throws E0 {
+    public Optional<T> findFirst() ${throws_list} {
         try {
             return stream.findFirst();
         } catch (ChkStreamWrappedException e) {
@@ -1238,7 +1276,7 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      * @throws NullPointerException if the element selected is null
      * @see #findFirst()
      */
-    public Optional<T> findAny() throws E0 {
+    public Optional<T> findAny() ${throws_list} {
         try {
             return stream.findAny();
         } catch (ChkStreamWrappedException e) {
@@ -1247,6 +1285,8 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
         }
     }
 
+    // Adapted static methods.
+
     /**
      * Creates a lazily concatenated stream whose elements are all the
      * elements of the first stream followed by all the elements of the
@@ -1265,9 +1305,11 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      * @param b the second stream
      * @return the concatenation of the two input streams
      */
-    public ChkStream<T, E0> concat(Stream<? extends T> b) {
+    public ${class_type('T')} concat(Stream<? extends T> b) {
         Stream<T> concatStream = Stream.concat(toStream(), b);
-        return new ChkStream<>(e0Class, concatStream);
+        return new ${class_name}<>(
+            ${', '.join(['e%dClass' % i for i in xrange(0, num_e)])},
+            concatStream);
     }
 
     /**
@@ -1288,11 +1330,29 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
      * @param b the second stream
      * @return the concatenation of the two input streams
      */
-    public ChkStream<T, E0> concat(ChkStream<? extends T, ? extends E0> b) {
+    public ${class_type('T')} concat(
+        ${class_name}<? extends T${exc_extend_list}> b) {
         return concat(b.toStream());
     }
 
     // New methods specific to ChkStream.
+
+    % if num_e != MAX_EXCEPTIONS:
+    <%
+      next_class_type = (
+          'ChkStream_Throw%d<T%s>' % (
+              num_e + 1, ','.join([exc_use_list, 'NewE'])))
+    %>
+    public <NewE extends Exception>
+    ${next_class_type} canThrow(Class<NewE> clazz) {
+        return new ${next_class_type}(
+            ${', '.join(
+                ['e%dClass' % i for i in xrange(0, num_e)] + ['clazz'])},
+            stream);
+    }
+    % else:
+    // canThrow() not generated; this stream type has the max allowed exceptions
+    % endif
 
     public Stream<T> toStream() {
         return stream;
@@ -1300,17 +1360,22 @@ public class ChkStream<T, E0 extends Exception> implements AutoCloseable {
 
     // Private methods.
 
-    private <R> ChkStream<R,E0> fromStream(Stream<R> stream) {
-        return new ChkStream<R, E0>(e0Class, stream);
+    private <R> ${class_type('R')} fromStream(Stream<R> stream) {
+        return new ${class_name}<R${exc_use_list}>(
+            ${''.join(['e%dClass,' % i for i in xrange(0, num_e)])}
+            stream);
     }
 
     @SuppressWarnings("unchecked")
-    private void rethrowException(ChkStreamWrappedException wrapE) throws E0 {
-      Throwable e = wrapE.getCause();
-      if (e instanceof RuntimeException) {
-        throw (RuntimeException) e;
-      }
-      if (e0Class.isInstance(e)) { throw (E0) e; }
-      throw wrapE;
+    private void rethrowException(ChkStreamWrappedException wrapE)
+        ${throws_list} {
+        Throwable e = wrapE.getCause();
+        if (e instanceof RuntimeException) {
+            throw (RuntimeException) e;
+        }
+        % for i in xrange(0, num_e):
+        if (e${i}Class.isInstance(e)) { throw (E${i}) e; }
+        % endfor
+        throw wrapE;
     }
 }

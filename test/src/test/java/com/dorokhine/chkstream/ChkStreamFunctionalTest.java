@@ -74,30 +74,27 @@ public class ChkStreamFunctionalTest {
                 .collect(Collectors.toList())
                 ).containsExactly(2, 4).inOrder();
     }
-    /*
-  @Test
-  public void testConcatSameType() throws IOException {
-    ChkStream_Throw1<Integer, IOException> stream =
-        wrap(Stream.of(1, 2, 3))
-          .map(x -> x + 10)
-          .concat(
-              wrap(Stream.of(4, 5, 6)
-                .canThrow(IOException.class)
-                .map(x -> x + 20));
-    List<Integer> results = stream.toList();
-    assertThat(results).containsExactly(11, 12, 13, 24, 25, 26).inOrder();
-  }
 
-  @Test
-  public void testConcatSafeType() throws IOException {
-    ChkStream_Throw1<Integer,IOException> stream =
-        wrap(Stream.of(1, 2, 3)
-          .map(x -> x + 10)
-          .concat(wrap(Stream.of(4, 5, 6)).map(x -> x + 20));
-    List<Integer> results = stream.toList();
-    assertThat(results).containsExactly(11, 12, 13, 24, 25, 26).inOrder();
-  }
-     */
+    @Test
+    public void testConcatSameType() throws IOException {
+        ChkStream<Integer, RuntimeException> stream =
+                wrap(Stream.of(1, 2, 3))
+                .map(x -> x + 10)
+                .concat(wrap(Stream.of(4, 5, 6)).map(x -> x + 20));
+        List<Integer> results = stream.collect(Collectors.toList());
+        assertThat(results).containsExactly(11, 12, 13, 24, 25, 26).inOrder();
+    }
+
+    @Test
+    public void testConcatSafeType() throws IOException {
+        ChkStream<Integer, RuntimeException> stream =
+                wrap(Stream.of(1, 2, 3))
+                .map(x -> x + 10)
+                .concat(Stream.of(4, 5, 6).map(x -> x + 20));
+        List<Integer> results = stream.collect(Collectors.toList());
+        assertThat(results).containsExactly(11, 12, 13, 24, 25, 26).inOrder();
+    }
+
     @Test
     public void testSort() {
         assertThat(

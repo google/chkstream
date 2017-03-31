@@ -1,4 +1,10 @@
 apply plugin: 'java'
 
+sourceSets {
+  main {
+    java.srcDir file('src/main/generated')
+  }
+}
+
 sourceCompatibility = 1.8
 targetCompatibility = 1.8

@@ -2,6 +2,7 @@
 .settings/
 bin/
 build/
+generated/
 
 .classpath
 .directory

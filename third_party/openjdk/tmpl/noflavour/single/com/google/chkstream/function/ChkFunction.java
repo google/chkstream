@@ -24,25 +24,35 @@
  */
 package com.google.chkstream.function;
 
-/**
- * Represents a predicate (boolean-valued function) of one argument.
- *
- * <p>This is a <a href="package-summary.html">functional interface</a>
- * whose functional method is {@link #test(Object)}.
- *
- * @param <T> the type of the input to the predicate
- *
- * @since 1.8
- */
-@FunctionalInterface
-public interface ChkPredicate<T, E0 extends Exception> {
+public final class ChkFunction {
+  private ChkFunction() {}
 
+  % for num_e in xrange(MIN_EXCEPTIONS, MAX_EXCEPTIONS  + 1):
+  <%
+    exc_decl_list = ', ' + ', '.join(
+        ['E%d extends Exception' % i for i in xrange(0, num_e)])
+    throws_list = 'throws ' + ', '.join(['E%d' % i for i in xrange(0, num_e)])
+  %>
+
+  /**
+   * Represents a function that accepts one argument and produces a result.
+   *
+   * <p>This is a <a href="package-summary.html">functional interface</a>
+   * whose functional method is {@link #apply(Object)}.
+   *
+   * @param <T> the type of the input to the function
+   * @param <R> the type of the result of the function
+   */
+  public static interface ChkFunction_Throw${num_e}
+  <T, R${exc_decl_list}>
+  {
     /**
-     * Evaluates this predicate on the given argument.
+     * Applies this function to the given argument.
      *
-     * @param t the input argument
-     * @return {@code true} if the input argument matches the predicate,
-     * otherwise {@code false}
+     * @param t the function argument
+     * @return the function result
      */
-    boolean test(T t) throws E0;
+    R apply(T t) ${throws_list};
+  }
+  % endfor
 }
