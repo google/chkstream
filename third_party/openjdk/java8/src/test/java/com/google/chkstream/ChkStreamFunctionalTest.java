@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import org.junit.Test;
@@ -55,7 +56,7 @@ public class ChkStreamFunctionalTest {
         List<String> results =
                 ChkStreams.of(Stream.of(1, 2, 3))
                 .canThrow(IOException.class)
-                .flatMapToChk(
+                .flatMapChk(
                         x ->
                         ChkStreams.of(Stream.of("yay " + x, "ok " + x, "nay " + x))
                         .canThrow(IOException.class)
@@ -240,6 +241,14 @@ public class ChkStreamFunctionalTest {
                 wrap(Stream.of(4, 5, 6)).map(x -> x * 100);
         assertThat(a.concat(b).collect(Collectors.toList()))
         .containsExactly(10, 20, 30, 400, 500, 600).inOrder();
+    }
+
+    @Test
+    public void testPrimitive() throws IOException {
+        double avg = ChkStreams.ofInt(IntStream.range(5, 10))
+            .canThrow(IOException.class)
+            .average().getAsDouble();
+        assertThat(avg).isWithin(0.01).of(7);
     }
 
     private static <T> ChkStream<T,RuntimeException> wrap(Stream<T> stream) {

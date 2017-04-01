@@ -24,14 +24,15 @@
  */
 package com.google.chkstream.function;
 
-public final class ChkRunnable {
-  private ChkRunnable() {}
+public final class ChkRunnables {
+  private ChkRunnables() {}
 
   % for num_e in xrange(MIN_EXCEPTIONS, MAX_EXCEPTIONS  + 1):
   <%
     exc_decl_list = ', '.join(
         ['E%d extends Exception' % i for i in xrange(0, num_e)])
     throws_list = 'throws ' + ', '.join(['E%d' % i for i in xrange(0, num_e)])
+    _ThrowN = '' if num_e == MIN_EXCEPTIONS else '_Throw%d' % num_e
   %>
 
   /**
@@ -56,7 +57,7 @@ public final class ChkRunnable {
    * unless the programmer intends on modifying or enhancing the fundamental
    * behavior of the class.
    */
-  public static interface ChkRunnable_Throw${num_e}
+  public static interface ChkRunnable${_ThrowN}
   <${exc_decl_list}>
   {
     /**

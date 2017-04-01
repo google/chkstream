@@ -24,35 +24,59 @@
  */
 package com.google.chkstream.function;
 
-public final class ChkFunction {
-  private ChkFunction() {}
+public final class ChkConsumers {
+  private ChkConsumers() {}
 
   % for num_e in xrange(MIN_EXCEPTIONS, MAX_EXCEPTIONS  + 1):
   <%
-    exc_decl_list = ', ' + ', '.join(
+    exc_decl_list = ', '.join(
         ['E%d extends Exception' % i for i in xrange(0, num_e)])
     throws_list = 'throws ' + ', '.join(['E%d' % i for i in xrange(0, num_e)])
+    _ThrowN = '' if num_e == MIN_EXCEPTIONS else '_Throw%d' % num_e
   %>
 
   /**
-   * Represents a function that accepts one argument and produces a result.
+   * Represents an operation that accepts a single input argument and returns no
+   * result. Unlike most other functional interfaces, {@code Consumer} is expected
+   * to operate via side-effects.
    *
    * <p>This is a <a href="package-summary.html">functional interface</a>
-   * whose functional method is {@link #apply(Object)}.
+   * whose functional method is {@link #accept(Object)}.
    *
-   * @param <T> the type of the input to the function
-   * @param <R> the type of the result of the function
+   * @param <T> the type of the input to the operation
    */
-  public static interface ChkFunction_Throw${num_e}
-  <T, R${exc_decl_list}>
+  public static interface ChkConsumer${_ThrowN}
+  <T, ${exc_decl_list}>
   {
     /**
-     * Applies this function to the given argument.
+     * Performs this operation on the given argument.
      *
-     * @param t the function argument
-     * @return the function result
+     * @param t the input argument
      */
-    R apply(T t) ${throws_list};
+    void accept(T t) ${throws_list};
   }
+
+  % for specialization in SPECIALIZATIONS:
+  /**
+   * Represents an operation that accepts a single input argument and returns no
+   * result. Unlike most other functional interfaces, {@code Consumer} is expected
+   * to operate via side-effects.
+   *
+   * <p>This is a <a href="package-summary.html">functional interface</a>
+   * whose functional method is {@link #accept(Object)}.
+   *
+   * @param <T> the type of the input to the operation
+   */
+  public static interface Chk${specialization}Consumer${_ThrowN}
+  <${exc_decl_list}>
+  {
+    /**
+     * Performs this operation on the given argument.
+     *
+     * @param t the input argument
+     */
+    void accept(${specialization.lower()} t) ${throws_list};
+  }
+  % endfor
   % endfor
 }

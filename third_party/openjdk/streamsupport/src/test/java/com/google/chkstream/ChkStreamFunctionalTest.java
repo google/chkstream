@@ -13,6 +13,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.*;
 
 import java.io.IOException;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,6 +23,7 @@ import com.google.chkstream.streamsupport.ChkStream;
 import com.google.chkstream.streamsupport.ChkStreams;
 
 import java8.util.stream.Collectors;
+import java8.util.stream.IntStreams;
 import java8.util.stream.RefStreams;
 import java8.util.stream.Stream;
 
@@ -57,7 +59,7 @@ public class ChkStreamFunctionalTest {
         List<String> results =
                 ChkStreams.of(RefStreams.of(1, 2, 3))
                 .canThrow(IOException.class)
-                .flatMapToChk(
+                .flatMapChk(
                         x ->
                         ChkStreams.of(RefStreams.of("yay " + x, "ok " + x, "nay " + x))
                         .canThrow(IOException.class)
@@ -242,6 +244,14 @@ public class ChkStreamFunctionalTest {
                 wrap(RefStreams.of(4, 5, 6)).map(x -> x * 100);
         assertThat(a.concat(b).collect(Collectors.toList()))
         .containsExactly(10, 20, 30, 400, 500, 600).inOrder();
+    }
+
+    @Test
+    public void testPrimitive() throws IOException, SQLException {
+        double avg = ChkStreams.ofInt(IntStreams.range(5, 10))
+            .canThrow(IOException.class)
+            .average().getAsDouble();
+        assertThat(avg).isWithin(0.01).of(7);
     }
 
     private static <T> ChkStream<T,RuntimeException> wrap(Stream<T> stream) {

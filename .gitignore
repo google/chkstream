@@ -4,7 +4,9 @@ bin/
 build/
 generated/
 
+*.pyc
 .classpath
 .directory
 .project
+.pydevproject
 env.sh
