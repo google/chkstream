@@ -7,6 +7,10 @@
 # Google designates this particular file as subject to the "Classpath"
 # exception as provided in the LICENSE file that accompanied this code.
 
+"""A script to format source code templates using Mako."""
+
+__author__ = 'Alexander Dorokhine'
+
 import logging
 from mako import lookup as mako_lookup
 from mako import template as mako_template

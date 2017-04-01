@@ -9,6 +9,16 @@
  */
 package com.google.chkstream;
 
+/**
+ * A {@link RuntimeException} that wraps another {@link Exception} type.
+ *
+ * <p>This wrapper is transparently handled by the {@link ChkStream}
+ * infrastructure. You should not be seeing it thrown out of @{link ChkStream}
+ * methods, unless you call {@link ChkStream#toStream()} to get the underlying
+ * raw {@link Stream} from a {@link ChkStream}.
+ *
+ * @author Alexander Dorokhine
+ */
 public class ChkStreamWrappedException extends RuntimeException {
     private static final long serialVersionUID = 1L;
     public ChkStreamWrappedException(Exception e) {

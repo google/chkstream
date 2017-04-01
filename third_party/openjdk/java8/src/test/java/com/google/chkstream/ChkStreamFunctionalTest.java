@@ -55,7 +55,7 @@ public class ChkStreamFunctionalTest {
         List<String> results =
                 ChkStreams.of(Stream.of(1, 2, 3))
                 .canThrow(IOException.class)
-                .flatMapToChkStream(
+                .flatMapToChk(
                         x ->
                         ChkStreams.of(Stream.of("yay " + x, "ok " + x, "nay " + x))
                         .canThrow(IOException.class)

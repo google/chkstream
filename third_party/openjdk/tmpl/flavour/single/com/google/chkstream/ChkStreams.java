@@ -16,9 +16,23 @@ import java.util.stream.Stream;
 import java8.util.stream.Stream;
 % endif
 
+/**
+ * Static methods for creating new instances of {@link ChkStream}.
+ *
+ * @author Alexander Dorokhine
+ */
 public final class ChkStreams {
     private ChkStreams() {}
 
+    /**
+     * A builder for initializing a {@link ChkStream} with a checked exception.
+     *
+     * <p>Call {@link #canThrow(Class)} to start a {@link ChkStream}.
+     * {@link ChkStream} implements the same method so more exceptions can be
+     * added later.
+     *
+     * @author Alexander Dorokhine
+     */
     public static final class ChkStreamStarter<T> {
         private final Stream<T> stream;
 
