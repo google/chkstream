@@ -1,1 +1,5 @@
-include (':third_party:openjdk', ':test')
+include (
+  ':third_party:openjdk:common',
+  ':third_party:openjdk:java8',
+  ':third_party:openjdk:streamsupport'
+)

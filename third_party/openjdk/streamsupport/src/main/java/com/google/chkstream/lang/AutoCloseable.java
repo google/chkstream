@@ -23,7 +23,7 @@
  * questions.
  */
 
-package java.lang;
+package com.google.chkstream.lang;
 
 /**
  * An object that may hold resources (such as file or socket handles)

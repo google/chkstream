@@ -7,3 +7,4 @@ generated/
 .classpath
 .directory
 .project
+env.sh

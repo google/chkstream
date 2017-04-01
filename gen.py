@@ -17,7 +17,7 @@ MIN_EXCEPTIONS = 1
 MAX_EXCEPTIONS = 5
 
 PROJECTS = ('third_party/openjdk',)
-FLAVOURS = ('java8',)
+FLAVOURS = ('java8', 'streamsupport')
 ROOT_PKG_DIR = 'com/google/chkstream'
 GEN_SRC_DIR = 'src/main/generated'
 
@@ -35,10 +35,10 @@ def _GetOutputPath(project_root, tmpl_dir, input_file, flavour=None):
   package_path = os.path.relpath(input_file, root_pkg_tmpl_dir)
   if flavour:
     output_file = os.path.join(
-      project_root, GEN_SRC_DIR, ROOT_PKG_DIR, flavour, package_path)
+      project_root, flavour, GEN_SRC_DIR, ROOT_PKG_DIR, flavour, package_path)
   else:
     output_file = os.path.join(
-        project_root, GEN_SRC_DIR, ROOT_PKG_DIR, package_path)
+        project_root, 'common', GEN_SRC_DIR, ROOT_PKG_DIR, package_path)
   output_file = os.path.normpath(output_file)
   return output_file
 

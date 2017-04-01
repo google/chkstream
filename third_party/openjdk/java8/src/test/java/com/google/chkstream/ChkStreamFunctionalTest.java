@@ -7,7 +7,7 @@
  * Google designates this particular file as subject to the "Classpath"
  * exception as provided in the LICENSE file that accompanied this code.
  */
-package com.dorokhine.chkstream;
+package com.google.chkstream;
 
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.*;

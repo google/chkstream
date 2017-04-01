@@ -37,28 +37,40 @@ ${class_name}<${contained_type}${exc_use_list}>\
 
 package com.google.chkstream.${flavour};
 
-import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
+
+% if flavour == 'java8':
 import java.util.Optional;
 import java.util.Spliterator;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collector;
-import java.util.stream.Collectors;
-import java.util.stream.DoubleStream;
-import java.util.stream.IntStream;
-import java.util.stream.LongStream;
 import java.util.stream.Stream;
+
+% else:
+import java8.util.Optional;
+import java8.util.Spliterator;
+import java8.util.function.BiConsumer;
+import java8.util.function.BiFunction;
+import java8.util.function.BinaryOperator;
+import java8.util.function.Consumer;
+import java8.util.function.Function;
+import java8.util.function.IntFunction;
+import java8.util.function.Predicate;
+import java8.util.function.Supplier;
+import java8.util.stream.Collector;
+import java8.util.stream.RefStreams;
+import java8.util.stream.Stream;
+
+import com.google.chkstream.lang.AutoCloseable;
+% endif
 
 import com.google.chkstream.ChkStreamWrappedException;
 import com.google.chkstream.function.ChkConsumer.ChkConsumer_Throw${num_e};
@@ -285,16 +297,20 @@ public class ${class_name}<T${exc_decl_list}>
      * @return a stream with a handler that is run if the stream is closed
      */
     public ${class_type('T')} onClose(
-        ChkRunnable_Throw${num_e}
+        final ChkRunnable_Throw${num_e}
             <${', '.join(['? extends E%d' % i for i in xrange(0, num_e)])}>
-            closeHandler) {
-        return fromStream(stream.onClose(() -> {
-            try {
-                closeHandler.run();
-            } catch (Exception e) {
-                throw new ChkStreamWrappedException(e);
-            }
-        }));
+                closeHandler) {
+      return fromStream(stream.onClose(
+          new Runnable() {
+              @Override
+              public void run() {
+                  try {
+                      closeHandler.run();
+                  } catch (Exception e) {
+                      throw new ChkStreamWrappedException(e);
+                  }
+              }
+          }));
     }
 
     /**
@@ -326,16 +342,20 @@ public class ${class_name}<T${exc_decl_list}>
      * @return the new stream
      */
     public ${class_type('T')} filter(
-        ChkPredicate_Throw${num_e}
+        final ChkPredicate_Throw${num_e}
             <? super T${exc_extend_list}>
                 predicate) {
-        return fromStream(stream.filter(t -> {
-            try {
-                return predicate.test(t);
-            } catch (Exception e) {
-                throw new ChkStreamWrappedException(e);
-            }
-        }));
+      return fromStream(stream.filter(
+          new Predicate<T>() {
+              @Override
+              public boolean test(T t) {
+                  try {
+                      return predicate.test(t);
+                  } catch (Exception e) {
+                      throw new ChkStreamWrappedException(e);
+                  }
+              }
+          }));
     }
 
     /**
@@ -352,17 +372,21 @@ public class ${class_name}<T${exc_decl_list}>
      * @return the new stream
      */
     public <R> ${class_type('R')} map(
-        ChkFunction_Throw${num_e}
+        final ChkFunction_Throw${num_e}
             <? super T,
              ? extends R${exc_extend_list}>
-                mapper) {
-        return fromStream(stream.map(t -> {
-            try {
-                return mapper.apply(t);
-            } catch (Exception e) {
-                throw new ChkStreamWrappedException(e);
-            }
-        }));
+                  mapper) {
+        return fromStream(stream.map(
+            new Function<T, R>() {
+                @Override
+                public R apply(T t) {
+                    try {
+                        return mapper.apply(t);
+                    } catch (Exception e) {
+                        throw new ChkStreamWrappedException(e);
+                    }
+                }
+            }));
     }
 
     /**
@@ -408,20 +432,24 @@ public class ${class_name}<T${exc_decl_list}>
      * @return the new stream
      */
     public <R> ${class_type('R')} flatMap(
-        ChkFunction_Throw${num_e}
+        final ChkFunction_Throw${num_e}
             <? super T,
              ? extends Stream<? extends R>
              ${exc_extend_list}>
-                mapper) {
-        return fromStream(stream.flatMap(t -> {
-            Stream<? extends R> subStream;
-            try {
-                subStream = mapper.apply(t);
-            } catch (Exception e) {
-                throw new ChkStreamWrappedException(e);
-            }
-            return subStream;
-        }));
+                  mapper) {
+        return fromStream(stream.flatMap(
+            new Function<T, Stream<? extends R>>() {
+                @Override
+                public Stream<? extends R> apply(T t) {
+                    Stream<? extends R> subStream;
+                    try {
+                        subStream = mapper.apply(t);
+                    } catch (Exception e) {
+                        throw new ChkStreamWrappedException(e);
+                    }
+                    return subStream;
+                }
+            }));
     }
 
     /**
@@ -467,20 +495,24 @@ public class ${class_name}<T${exc_decl_list}>
      * @return the new stream
      */
     public <R> ${class_type('R')} flatMapToChkStream(
-        ChkFunction_Throw${num_e}
+        final ChkFunction_Throw${num_e}
             <? super T,
              ? extends ${class_name}<? extends R${exc_extend_list}>
              ${exc_extend_list}>
-                mapper) {
-        return fromStream(stream.flatMap(t -> {
-            ${class_name}<? extends R${exc_extend_list}> subStream;
-            try {
-                subStream = mapper.apply(t);
-            } catch (Exception e) {
-                throw new ChkStreamWrappedException(e);
-            }
-            return subStream.toStream();
-        }));
+                  mapper) {
+        return fromStream(stream.flatMap(
+            new Function<T, Stream<? extends R>>() {
+                @Override
+                public Stream<? extends R> apply(T t) {
+                    ${class_name}<? extends R${exc_extend_list}> subStream;
+                    try {
+                        subStream = mapper.apply(t);
+                    } catch (Exception e) {
+                        throw new ChkStreamWrappedException(e);
+                    }
+                    return subStream.toStream();
+                }
+            }));
     }
 
     /**
@@ -581,15 +613,20 @@ public class ${class_name}<T${exc_decl_list}>
      * @return the new stream
      */
     public ${class_type('T')} peek(
-        ChkConsumer_Throw${num_e}<? super T${exc_extend_list}>
-            action) {
-        return fromStream(stream.peek(t -> {
-            try {
-                action.accept(t);
-            } catch (Exception e) {
-                throw new ChkStreamWrappedException(e);
-            }
-        }));
+        final ChkConsumer_Throw${num_e}
+            <? super T${exc_extend_list}>
+                action) {
+        return fromStream(stream.peek(
+            new Consumer<T>() {
+                @Override
+                public void accept(T t) {
+                    try {
+                        action.accept(t);
+                    } catch (Exception e) {
+                        throw new ChkStreamWrappedException(e);
+                    }
+                }
+            }));
     }
 
     /**
@@ -670,19 +707,22 @@ public class ${class_name}<T${exc_decl_list}>
      *               non-interfering</a> action to perform on the elements
      */
     public void forEach(
-        ChkConsumer_Throw${num_e}<? super T${exc_extend_list}>
+        final ChkConsumer_Throw${num_e}<? super T${exc_extend_list}>
             action) ${throws_list} {
         try {
-            stream.forEach(t -> {
-                try {
-                    action.accept(t);
-                } catch (Exception e) {
-                    throw new ChkStreamWrappedException(e);
-                }
-            });
-        } catch (ChkStreamWrappedException e) {
-            rethrowException(e);
-        }
+          stream.forEach(new Consumer<T>() {
+              @Override
+              public void accept(T t) {
+                  try {
+                      action.accept(t);
+                  } catch (Exception e) {
+                      throw new ChkStreamWrappedException(e);
+                  }
+              }
+          });
+      } catch (ChkStreamWrappedException e) {
+          rethrowException(e);
+      }
     }
 
     /**
@@ -703,14 +743,17 @@ public class ${class_name}<T${exc_decl_list}>
      * @see #forEach(Consumer)
      */
     public void forEachOrdered(
-        ChkConsumer_Throw${num_e}<? super T${exc_extend_list}>
+        final ChkConsumer_Throw${num_e}<? super T${exc_extend_list}>
             action) ${throws_list} {
         try {
-            stream.forEachOrdered(t -> {
-                try {
-                    action.accept(t);
-                } catch (Exception e) {
-                    throw new ChkStreamWrappedException(e);
+            stream.forEachOrdered(new Consumer<T>() {
+                @Override
+                public void accept(T t) {
+                    try {
+                        action.accept(t);
+                    } catch (Exception e) {
+                        throw new ChkStreamWrappedException(e);
+                    }
                 }
             });
         } catch (ChkStreamWrappedException e) {
@@ -1145,16 +1188,20 @@ public class ${class_name}<T${exc_decl_list}>
      * predicate, otherwise {@code false}
      */
     public boolean anyMatch(
-        ChkPredicate_Throw${num_e}<? super T${exc_extend_list}>
+        final ChkPredicate_Throw${num_e}<? super T${exc_extend_list}>
             predicate) ${throws_list} {
         try {
-            return stream.anyMatch(t -> {
-                try {
-                    return predicate.test(t);
-                } catch (Exception e) {
-                    throw new ChkStreamWrappedException(e);
-                }
-            });
+            return stream.anyMatch(
+                new Predicate<T>() {
+                    @Override
+                    public boolean test(T t) {
+                        try {
+                            return predicate.test(t);
+                        } catch (Exception e) {
+                            throw new ChkStreamWrappedException(e);
+                        }
+                    }
+                });
         } catch (ChkStreamWrappedException e) {
             rethrowException(e);
             return false;
@@ -1183,16 +1230,20 @@ public class ${class_name}<T${exc_decl_list}>
      * provided predicate or the stream is empty, otherwise {@code false}
      */
     public boolean allMatch(
-        ChkPredicate_Throw${num_e}<? super T${exc_extend_list}>
+        final ChkPredicate_Throw${num_e}<? super T${exc_extend_list}>
             predicate) ${throws_list} {
         try {
-            return stream.allMatch(t -> {
-                try {
-                    return predicate.test(t);
-                } catch (Exception e) {
-                    throw new ChkStreamWrappedException(e);
-                }
-            });
+            return stream.allMatch(
+                new Predicate<T>() {
+                    @Override
+                    public boolean test(T t) {
+                        try {
+                            return predicate.test(t);
+                        } catch (Exception e) {
+                            throw new ChkStreamWrappedException(e);
+                        }
+                    }
+                });
         } catch (ChkStreamWrappedException e) {
             rethrowException(e);
             return false;
@@ -1221,16 +1272,20 @@ public class ${class_name}<T${exc_decl_list}>
      * provided predicate or the stream is empty, otherwise {@code false}
      */
     public boolean noneMatch(
-        ChkPredicate_Throw${num_e}<? super T${exc_extend_list}>
+        final ChkPredicate_Throw${num_e}<? super T${exc_extend_list}>
             predicate) ${throws_list} {
         try {
-            return stream.noneMatch(t -> {
-                try {
-                    return predicate.test(t);
-                } catch (Exception e) {
-                    throw new ChkStreamWrappedException(e);
-                }
-            });
+            return stream.noneMatch(
+                new Predicate<T>() {
+                    @Override
+                    public boolean test(T t) {
+                        try {
+                            return predicate.test(t);
+                        } catch (Exception e) {
+                            throw new ChkStreamWrappedException(e);
+                        }
+                    }
+                });
         } catch (ChkStreamWrappedException e) {
             rethrowException(e);
             return false;
@@ -1306,8 +1361,10 @@ public class ${class_name}<T${exc_decl_list}>
      * @return the concatenation of the two input streams
      */
     public ${class_type('T')} concat(Stream<? extends T> b) {
-        Stream<T> concatStream = Stream.concat(toStream(), b);
-        return new ${class_name}<>(
+        Stream<T> concatStream =
+            ${'Stream' if flavour == 'java8' else 'RefStreams'}
+                .concat(toStream(), b);
+        return new ${class_name}<T${exc_use_list}>(
             ${', '.join(['e%dClass' % i for i in xrange(0, num_e)])},
             concatStream);
     }

@@ -7,9 +7,14 @@
  * Google designates this particular file as subject to the "Classpath"
  * exception as provided in the LICENSE file that accompanied this code.
  */
-package com.google.chkstream.java8;
+package com.google.chkstream.${flavour};
 
+% if flavour == 'java8':
 import java.util.stream.Stream;
+
+% else:
+import java8.util.stream.Stream;
+% endif
 
 public final class ChkStreams {
     private ChkStreams() {}
@@ -31,9 +36,8 @@ public final class ChkStreams {
          * @return the newly created stream.
          */
         public <E extends Exception> ChkStream<T, E> canThrow(
-                Class<E> exceptionClass)
-        {
-            return new ChkStream<>(exceptionClass, stream);
+            Class<E> exceptionClass) {
+            return new ChkStream<T, E>(exceptionClass, stream);
         }
     }
 
@@ -42,6 +46,6 @@ public final class ChkStreams {
      * {@link Stream}.
      */
     public static <T> ChkStreamStarter<T> of(Stream<T> stream) {
-        return new ChkStreamStarter<>(stream);
+        return new ChkStreamStarter<T>(stream);
     }
 }
