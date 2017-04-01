@@ -1,4 +1,7 @@
 subprojects {
+  repositories {
+    mavenCentral()
+  }
   gradle.projectsEvaluated {
     tasks.withType(JavaCompile) {
       options.compilerArgs << "-Xlint:all"

@@ -15,5 +15,7 @@ third_party {
   version: "b132"
   last_upgrade_date { year: 2017 month: 03 day: 31 }
   local_modifications:
-    "- Only certain files relevant to Streams have been retained."
+    "- Only certain files relevant to Streams have been retained.\n"
+    "- The files have been significantly changed to adapt them to a templating "
+    "  engine and allow them to throw checked exceptions."
 }

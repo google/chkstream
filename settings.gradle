@@ -1,1 +1,1 @@
-include (':third_party:openjdk')
+include (':third_party:openjdk', ':test')
