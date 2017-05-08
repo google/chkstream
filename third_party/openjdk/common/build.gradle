@@ -1,4 +1,4 @@
-apply plugin: 'java'
+apply plugin: 'java-library'
 apply plugin: 'maven-publish'
 
 sourceSets {
@@ -9,6 +9,21 @@ sourceSets {
 
 sourceCompatibility = 1.6
 targetCompatibility = 1.6
+
+task srcJar(type: Jar, dependsOn: classes) {
+  classifier = 'src'
+  from sourceSets.main.allSource
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+  classifier = 'javadoc'
+  from javadoc.destinationDir
+}
+
+artifacts {
+  archives srcJar
+  archives javadocJar
+}
 
 publishing {
   publications {
