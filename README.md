@@ -30,6 +30,7 @@ ChkStreams.of(filenames.parallelStream())
 ## Usage
 
 ChkStreams extends the existing Java 8 Stream API. To use it, simply:
+
 1.  Wrap any `Stream` using `ChkStreams.of(Stream)` to get a `ChkStream`.
 2.  Declare one or more checked exceptions by calling
     `ChkStream#canThrow(Exception)`, so that subsequent stream operations will
@@ -50,7 +51,7 @@ ChkStreams extends the existing Java 8 Stream API. To use it, simply:
   `ChkStream#toStream()` will throw unchecked exceptions (specifically
   `ChkStreamWrappedException`) when checked exceptions occur in the stream.
 * All primitive specializations of `Stream` are supported without boxing (See
-  `ChkStreams#ofInt(IntStream)`.
+  `ChkStreams#ofInt(IntStream)`).
 * (Optional) support for the
   [StreamSupport backport](https://streamsupport.sourceforge.io/) and
   [Retrolambda](https://github.com/orfjackal/retrolambda). Enjoy the power of
