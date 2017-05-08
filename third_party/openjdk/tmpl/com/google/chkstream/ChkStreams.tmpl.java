@@ -7,12 +7,21 @@
  * Google designates this particular file as subject to the "Classpath"
  * exception as provided in the LICENSE file that accompanied this code.
  */
-package com.google.chkstream.${flavour};
 
-% if flavour == 'java8':
+<%! for_each_stream_impl = True %>
+
+package com.google.chkstream.${stream_impl};
+
+% if stream_impl == 'java8':
+import java.util.stream.DoubleStream;
+import java.util.stream.IntStream;
+import java.util.stream.LongStream;
 import java.util.stream.Stream;
 
 % else:
+import java8.util.stream.DoubleStream;
+import java8.util.stream.IntStream;
+import java8.util.stream.LongStream;
 import java8.util.stream.Stream;
 % endif
 
@@ -62,4 +71,40 @@ public final class ChkStreams {
     public static <T> ChkStreamStarter<T> of(Stream<T> stream) {
         return new ChkStreamStarter<T>(stream);
     }
+
+    // Support the specializations
+    % for specialization in SPECIALIZATIONS:
+    public static final class Chk${specialization}StreamStarter {
+        private final ${specialization}Stream stream;
+
+        private Chk${specialization}StreamStarter(
+            ${specialization}Stream stream) {
+            this.stream = stream;
+        }
+
+        /**
+         * Initializes a {@link Chk${specialization}Stream} with the given
+         * exception type.
+         *
+         * <p>Additional exceptions can be added later by calling
+         * {@link Chk${specialization}Stream#canThrow(Class)}.
+         *
+         * @param exceptionClass Class of the exception this stream can throw.
+         * @return the newly created stream.
+         */
+        public <E extends Exception> Chk${specialization}Stream<E> canThrow(
+            Class<E> exceptionClass) {
+            return new Chk${specialization}Stream<E>(exceptionClass, stream);
+        }
+    }
+
+    /**
+     * Returns a builder for a {@link Chk${specialization}Stream} wrapping the
+     * given {@link ${specialization}Stream}.
+     */
+    public static Chk${specialization}StreamStarter of${specialization}(
+        ${specialization}Stream stream) {
+        return new Chk${specialization}StreamStarter(stream);
+    }
+    % endfor
 }

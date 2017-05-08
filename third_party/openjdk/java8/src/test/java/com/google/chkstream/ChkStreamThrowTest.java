@@ -17,7 +17,7 @@ import java.util.stream.Stream;
 
 import org.junit.Test;
 
-import com.google.chkstream.function.ChkFunction.ChkFunction_Throw1;
+import com.google.chkstream.function.ChkFunctions.ChkFunction;
 import com.google.chkstream.java8.ChkStream_Throw2;
 import com.google.chkstream.java8.ChkStreams;
 
@@ -81,7 +81,7 @@ public class ChkStreamThrowTest {
     public void testCanThrowDerived() throws IOException {
         try {
             ChkStreams.of(Stream.of(1)).canThrow(IOException.class).map(
-                new ChkFunction_Throw1<Integer, Void, FileNotFoundException>() {
+                new ChkFunction<Integer, Void, FileNotFoundException>() {
                     @Override
                     public Void apply(Integer t) throws FileNotFoundException {
                         throw new FileNotFoundException(

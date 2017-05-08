@@ -24,35 +24,58 @@
  */
 package com.google.chkstream.function;
 
-public final class ChkConsumer {
-  private ChkConsumer() {}
+public final class ChkPredicates {
+  private ChkPredicates() {}
 
   % for num_e in xrange(MIN_EXCEPTIONS, MAX_EXCEPTIONS  + 1):
   <%
-    exc_decl_list = ', ' + ', '.join(
+    exc_decl_list = ', '.join(
         ['E%d extends Exception' % i for i in xrange(0, num_e)])
     throws_list = 'throws ' + ', '.join(['E%d' % i for i in xrange(0, num_e)])
+    _ThrowN = '' if num_e == MIN_EXCEPTIONS else '_Throw%d' % num_e
   %>
 
   /**
-   * Represents an operation that accepts a single input argument and returns no
-   * result. Unlike most other functional interfaces, {@code Consumer} is expected
-   * to operate via side-effects.
+   * Represents a predicate (boolean-valued function) of one argument.
    *
    * <p>This is a <a href="package-summary.html">functional interface</a>
-   * whose functional method is {@link #accept(Object)}.
+   * whose functional method is {@link #test(Object)}.
    *
-   * @param <T> the type of the input to the operation
+   * @param <T> the type of the input to the predicate
    */
-  public static interface ChkConsumer_Throw${num_e}
-  <T${exc_decl_list}>
+  public static interface ChkPredicate${_ThrowN}
+  <T, ${exc_decl_list}>
   {
     /**
-     * Performs this operation on the given argument.
+     * Evaluates this predicate on the given argument.
      *
      * @param t the input argument
+     * @return {@code true} if the input argument matches the predicate,
+     * otherwise {@code false}
      */
-    void accept(T t) ${throws_list};
+    boolean test(T t) ${throws_list};
   }
+
+  % for specialization in SPECIALIZATIONS:
+  /**
+   * Represents a predicate (boolean-valued function) of one ${specialization}
+   * argument.
+   *
+   * <p>This is a <a href="package-summary.html">functional interface</a>
+   * whose functional method is {@link #test(${specialization})}.
+   */
+  public static interface Chk${specialization}Predicate${_ThrowN}
+  <${exc_decl_list}>
+  {
+    /**
+     * Evaluates this predicate on the given argument.
+     *
+     * @param t the input argument
+     * @return {@code true} if the input argument matches the predicate,
+     * otherwise {@code false}
+     */
+    boolean test(${specialization.lower()} value) ${throws_list};
+  }
+  % endfor
   % endfor
 }

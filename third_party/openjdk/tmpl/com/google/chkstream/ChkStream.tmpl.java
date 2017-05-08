@@ -23,36 +23,58 @@
  * questions.
  */
 
-<%
-  exc_decl_list = ', ' + ', '.join(
-      ['E%d extends Exception' % i for i in xrange(0, num_e)])
-  exc_use_list = ', ' + ', '.join(['E%d' % i for i in xrange(0, num_e)])
-  exc_extend_list = ', ' + ', '.join(
-      ['? extends E%d' % i for i in xrange(0, num_e)])
-  throws_list = 'throws ' + ', '.join(['E%d' % i for i in xrange(0, num_e)])
+<%!
+  split = True
+  for_each_stream_impl = True
+
+  def get_class_name(num_exceptions, min_exceptions, specialization=None):
+    class_name = 'ChkStream'
+    if num_exceptions != min_exceptions:
+      class_name = '%s_Throw%d' % (class_name, num_exceptions)
+    return class_name
+
+  def get_filename(num_exceptions, min_exceptions, specialization):
+    return get_class_name(
+        num_exceptions, min_exceptions, specialization) + '.java'
 %>
-<%def name="class_type(contained_type)">\
-${class_name}<${contained_type}${exc_use_list}>\
-</%def>
 
-package com.google.chkstream.${flavour};
+<%
+  throws_list = 'throws ' + ', '.join(['E%d' % i for i in xrange(0, num_e)])
+  _ThrowN = '' if num_e == MIN_EXCEPTIONS else '_Throw%d' % num_e
+  class_name = get_class_name(num_e, MIN_EXCEPTIONS, None)
 
-import java.util.Comparator;
-import java.util.Iterator;
+  def exc_list(extends=False, declare=False):
+    string = ', '.join(
+        ['%sE%d%s' % (
+            '? extends ' if extends else '',
+            i,
+            ' extends Exception' if declare else '')
+            for i in xrange(0, num_e)])
+    return string
 
-% if flavour == 'java8':
+  def class_type(contained_type='T', extends=False, declare=False):
+    return '%s<%s, %s>' % (
+        class_name, contained_type, exc_list(extends, declare))
+%>
+
+package com.google.chkstream.${stream_impl};
+
+% if stream_impl == 'java8':
 import java.util.Optional;
 import java.util.Spliterator;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntFunction;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collector;
+import java.util.stream.DoubleStream;
+import java.util.stream.IntStream;
+import java.util.stream.LongStream;
 import java.util.stream.Stream;
+
+import com.google.chkstream.java8.function.FunctionUtils_Throw${num_e};
 
 % else:
 import java8.util.Optional;
@@ -60,23 +82,29 @@ import java8.util.Spliterator;
 import java8.util.function.BiConsumer;
 import java8.util.function.BiFunction;
 import java8.util.function.BinaryOperator;
-import java8.util.function.Consumer;
 import java8.util.function.Function;
 import java8.util.function.IntFunction;
-import java8.util.function.Predicate;
 import java8.util.function.Supplier;
 import java8.util.stream.Collector;
+import java8.util.stream.DoubleStream;
+import java8.util.stream.IntStream;
+import java8.util.stream.LongStream;
 import java8.util.stream.RefStreams;
 import java8.util.stream.Stream;
 
+import com.google.chkstream.streamsupport.function.FunctionUtils_Throw${num_e};
 import com.google.chkstream.lang.AutoCloseable;
+
 % endif
 
+import java.util.Comparator;
+import java.util.Iterator;
+
 import com.google.chkstream.ChkStreamWrappedException;
-import com.google.chkstream.function.ChkConsumer.ChkConsumer_Throw${num_e};
-import com.google.chkstream.function.ChkFunction.ChkFunction_Throw${num_e};
-import com.google.chkstream.function.ChkPredicate.ChkPredicate_Throw${num_e};
-import com.google.chkstream.function.ChkRunnable.ChkRunnable_Throw${num_e};
+import com.google.chkstream.function.ChkConsumers.*;
+import com.google.chkstream.function.ChkFunctions.*;
+import com.google.chkstream.function.ChkPredicates.*;
+import com.google.chkstream.function.ChkRunnables.*;
 
 /**
  * A sequence of elements supporting sequential and parallel aggregate
@@ -94,12 +122,13 @@ import com.google.chkstream.function.ChkRunnable.ChkRunnable_Throw${num_e};
  *
  * @author Alexander Dorokhine
  */
-public class ${class_name}<T${exc_decl_list}>
+public class ${class_type(declare=True)}
     implements AutoCloseable {
     private final Stream<T> stream;
     % for i in xrange(0, num_e):
     private final Class<E${i}> e${i}Class;
     % endfor
+    private final FunctionUtils_Throw${num_e} functionUtils;
 
     ${class_name}(
         % for i in xrange(0, num_e):
@@ -110,6 +139,7 @@ public class ${class_name}<T${exc_decl_list}>
       % for i in xrange(0, num_e):
       this.e${i}Class = e${i}Class;
       % endfor
+      this.functionUtils = new FunctionUtils_Throw${num_e}();
     }
 
     // Methods from BaseStream.
@@ -117,7 +147,7 @@ public class ${class_name}<T${exc_decl_list}>
     /**
      * Returns an iterator for the elements of this stream.
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">terminal
+     * <p>This is a <a href="package-summary.html#StreamOps">terminal
      * operation</a>.
      *
      * @return the element iterator for this stream
@@ -129,7 +159,7 @@ public class ${class_name}<T${exc_decl_list}>
     /**
      * Returns a spliterator for the elements of this stream.
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">terminal
+     * <p>This is a <a href="package-summary.html#StreamOps">terminal
      * operation</a>.
      *
      * @return the element spliterator for this stream
@@ -154,12 +184,12 @@ public class ${class_name}<T${exc_decl_list}>
      * itself, either because the stream was already sequential, or because
      * the underlying stream state was modified to be sequential.
      *
-     * <p>This is an <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">intermediate
+     * <p>This is an <a href="package-summary.html#StreamOps">intermediate
      * operation</a>.
      *
      * @return a sequential stream
      */
-    public ${class_type('T')} sequential() {
+    public ${class_type()} sequential() {
         return fromStream(stream.sequential());
     }
 
@@ -168,27 +198,27 @@ public class ${class_name}<T${exc_decl_list}>
      * itself, either because the stream was already parallel, or because
      * the underlying stream state was modified to be parallel.
      *
-     * <p>This is an <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">intermediate
+     * <p>This is an <a href="package-summary.html#StreamOps">intermediate
      * operation</a>.
      *
      * @return a parallel stream
      */
-    public ${class_type('T')} parallel() {
+    public ${class_type()} parallel() {
         return fromStream(stream.parallel());
     }
 
     /**
      * Returns an equivalent stream that is
-     * <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Ordering">unordered</a>.  May return
+     * <a href="package-summary.html#Ordering">unordered</a>.  May return
      * itself, either because the stream was already unordered, or because
      * the underlying stream state was modified to be unordered.
      *
-     * <p>This is an <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">intermediate
+     * <p>This is an <a href="package-summary.html#StreamOps">intermediate
      * operation</a>.
      *
      * @return an unordered stream
      */
-    public ${class_type('T')} unordered() {
+    public ${class_type()} unordered() {
         return fromStream(stream.unordered());
     }
 
@@ -204,27 +234,18 @@ public class ${class_name}<T${exc_decl_list}>
      * first exception, since an exception cannot suppress itself.)  May
      * return itself.
      *
-     * <p>This is an <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">intermediate
+     * <p>This is an <a href="package-summary.html#StreamOps">intermediate
      * operation</a>.
      *
      * @param closeHandler A task to execute when the stream is closed
      * @return a stream with a handler that is run if the stream is closed
      */
-    public ${class_type('T')} onClose(
-        final ChkRunnable_Throw${num_e}
-            <${', '.join(['? extends E%d' % i for i in xrange(0, num_e)])}>
+    public ${class_type()} onClose(
+        final ChkRunnable${_ThrowN}
+            <${exc_list(extends=True)}>
                 closeHandler) {
-      return fromStream(stream.onClose(
-          new Runnable() {
-              @Override
-              public void run() {
-                  try {
-                      closeHandler.run();
-                  } catch (Exception e) {
-                      throw new ChkStreamWrappedException(e);
-                  }
-              }
-          }));
+      return fromStream(
+          stream.onClose(functionUtils.wrapChkRunnable(closeHandler)));
     }
 
     /**
@@ -246,61 +267,43 @@ public class ${class_name}<T${exc_decl_list}>
      * Returns a stream consisting of the elements of this stream that match
      * the given predicate.
      *
-     * <p>This is an <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">intermediate
+     * <p>This is an <a href="package-summary.html#StreamOps">intermediate
      * operation</a>.
      *
-     * @param predicate a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#NonInterference">non-interfering</a>,
-     *                  <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Statelessness">stateless</a>
+     * @param predicate a <a href="package-summary.html#NonInterference">non-interfering</a>,
+     *                  <a href="package-summary.html#Statelessness">stateless</a>
      *                  predicate to apply to each element to determine if it
      *                  should be included
      * @return the new stream
      */
-    public ${class_type('T')} filter(
-        final ChkPredicate_Throw${num_e}
-            <? super T${exc_extend_list}>
+    public ${class_type()} filter(
+        final ChkPredicate${_ThrowN}
+            <? super T, ${exc_list(extends=True)}>
                 predicate) {
-      return fromStream(stream.filter(
-          new Predicate<T>() {
-              @Override
-              public boolean test(T t) {
-                  try {
-                      return predicate.test(t);
-                  } catch (Exception e) {
-                      throw new ChkStreamWrappedException(e);
-                  }
-              }
-          }));
+      return fromStream(
+          stream.filter(functionUtils.wrapChkPredicate(predicate)));
     }
 
     /**
      * Returns a stream consisting of the results of applying the given
      * function to the elements of this stream.
      *
-     * <p>This is an <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">intermediate
+     * <p>This is an <a href="package-summary.html#StreamOps">intermediate
      * operation</a>.
      *
      * @param <R> The element type of the new stream
-     * @param mapper a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#NonInterference">non-interfering</a>,
-     *               <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Statelessness">stateless</a>
+     * @param mapper a <a href="package-summary.html#NonInterference">non-interfering</a>,
+     *               <a href="package-summary.html#Statelessness">stateless</a>
      *               function to apply to each element
      * @return the new stream
      */
     public <R> ${class_type('R')} map(
-        final ChkFunction_Throw${num_e}
+        final ChkFunction${_ThrowN}
             <? super T,
-             ? extends R${exc_extend_list}>
+             ? extends R,
+             ${exc_list(extends=True)}>
                   mapper) {
-        return fromStream(stream.map(
-            new Function<T, R>() {
-                @Override
-                public R apply(T t) {
-                    try {
-                        return mapper.apply(t);
-                    } catch (Exception e) {
-                        throw new ChkStreamWrappedException(e);
-                    }
-                }
-            }));
+        return fromStream(stream.map(functionUtils.wrapChkFunction(mapper)));
     }
 
     /**
@@ -311,7 +314,7 @@ public class ${class_name}<T${exc_decl_list}>
      * have been placed into this stream.  (If a mapped stream is {@code null}
      * an empty stream is used, instead.)
      *
-     * <p>This is an <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">intermediate
+     * <p>This is an <a href="package-summary.html#StreamOps">intermediate
      * operation</a>.
      *
      * @apiNote
@@ -339,48 +342,39 @@ public class ${class_name}<T${exc_decl_list}>
      * creates a stream of words from that array.
      *
      * @param <R> The element type of the new stream
-     * @param mapper a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#NonInterference">non-interfering</a>,
-     *               <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Statelessness">stateless</a>
+     * @param mapper a <a href="package-summary.html#NonInterference">non-interfering</a>,
+     *               <a href="package-summary.html#Statelessness">stateless</a>
      *               function to apply to each element which produces a stream
      *               of new values
      * @return the new stream
      */
     public <R> ${class_type('R')} flatMap(
-        final ChkFunction_Throw${num_e}
+        final ChkFunction${_ThrowN}
             <? super T,
-             ? extends Stream<? extends R>
-             ${exc_extend_list}>
+             ? extends Stream<? extends R>,
+             ${exc_list(extends=True)}>
                   mapper) {
-        return fromStream(stream.flatMap(
-            new Function<T, Stream<? extends R>>() {
-                @Override
-                public Stream<? extends R> apply(T t) {
-                    Stream<? extends R> subStream;
-                    try {
-                        subStream = mapper.apply(t);
-                    } catch (Exception e) {
-                        throw new ChkStreamWrappedException(e);
-                    }
-                    return subStream;
-                }
-            }));
+        return fromStream(
+            stream.flatMap(functionUtils.wrapChkFunction(mapper)));
     }
 
     /**
-     * Like #map(ChkFunction_Throw${num_e}), except the function returns a
+     * Like #map(ChkFunction${_ThrowN}), except the function returns a
      * {@link ChkStream} of the same generic type as this stream.
      */
-    public <R> ${class_type('R')} flatMapToChk(
-        final ChkFunction_Throw${num_e}
+    public <R> ${class_type('R')} flatMapChk(
+        final ChkFunction${_ThrowN}
             <? super T,
-             ? extends ${class_name}<? extends R${exc_extend_list}>
-             ${exc_extend_list}>
+             ? extends ${class_name}
+                <? extends R, ${exc_list(extends=True)}>,
+             ${exc_list(extends=True)}>
                   mapper) {
         return fromStream(stream.flatMap(
             new Function<T, Stream<? extends R>>() {
                 @Override
                 public Stream<? extends R> apply(T t) {
-                    ${class_name}<? extends R${exc_extend_list}> subStream;
+                    ${class_name}<? extends R, ${exc_list(extends=True)}>
+                        subStream;
                     try {
                         subStream = mapper.apply(t);
                     } catch (Exception e) {
@@ -391,6 +385,103 @@ public class ${class_name}<T${exc_decl_list}>
             }));
     }
 
+    % for dest_specialization in ('Int', 'Long', 'Double'):
+    /**
+     * Returns an {@code ${dest_specialization}Stream} consisting of the results
+     * of applying the given function to the elements of this stream.
+     *
+     * <p>This is an <a href="package-summary.html#StreamOps">
+     *     intermediate operation</a>.
+     *
+     * @param mapper a <a href="package-summary.html#NonInterference">non-interfering</a>,
+     *               <a href="package-summary.html#Statelessness">stateless</a>
+     *               function to apply to each element
+     * @return the new stream
+     */
+    public
+    Chk${dest_specialization}Stream${_ThrowN}<${exc_list()}>
+        mapTo${dest_specialization}(
+            final ChkTo${dest_specialization}Function${_ThrowN}
+                <T, ${exc_list(extends=True)}>
+                    mapper) {
+        ${dest_specialization}Stream newStream =
+            stream.mapTo${dest_specialization}(
+                functionUtils.wrapChkTo${dest_specialization}Function(mapper));
+        return new Chk${dest_specialization}Stream${_ThrowN}<${exc_list()}>(
+            ${''.join(['e%dClass,' % i for i in xrange(0, num_e)])}
+            newStream);
+    }
+
+    /**
+     * Returns an {@code IntStream} consisting of the results of replacing each
+     * element of this stream with the contents of a mapped stream produced by
+     * applying the provided mapping function to each element.  Each mapped
+     * stream is {@link java.util.stream.BaseStream#close() closed} after its
+     * contents have been placed into this stream.  (If a mapped stream is
+     * {@code null} an empty stream is used, instead.)
+     *
+     * <p>This is an <a href="package-summary.html#StreamOps">intermediate
+     * operation</a>.
+     *
+     * @param mapper a <a href="package-summary.html#NonInterference">non-interfering</a>,
+     *               <a href="package-summary.html#Statelessness">stateless</a>
+     *               function to apply to each element which produces a stream
+     *               of new values
+     * @return the new stream
+     * @see #flatMap(Function)
+     */
+    public
+    Chk${dest_specialization}Stream${_ThrowN}<${exc_list()}>
+        flatMapTo${dest_specialization}(
+            final ChkFunction${_ThrowN}
+                <? super T,
+                 ? extends ${dest_specialization}Stream,
+                 ${exc_list(extends=True)}>
+                      mapper) {
+        ${dest_specialization}Stream newStream =
+            stream.flatMapTo${dest_specialization}(
+                functionUtils.wrapChkFunction(mapper));
+        return new Chk${dest_specialization}Stream${_ThrowN}<${exc_list()}>(
+            ${''.join(['e%dClass,' % i for i in xrange(0, num_e)])}
+            newStream);
+    }
+
+    /**
+     * Like #flatMapTo${dest_specialization}(ChkFunction${_ThrowN}), except
+     * the function returns a {@link ChkStream} of the same generic type as this
+     * stream.
+     */
+    public
+    Chk${dest_specialization}Stream${_ThrowN}<${exc_list()}>
+        flatMapChkTo${dest_specialization}(
+            final ChkFunction${_ThrowN}
+                <? super T,
+                 ? extends Chk${dest_specialization}Stream${_ThrowN}
+                     <${exc_list(extends=True)}>,
+                 ${exc_list(extends=True)}>
+                      mapper) {
+          ${dest_specialization}Stream newStream =
+              stream.flatMapTo${dest_specialization}(
+                  new Function<T, ${dest_specialization}Stream>() {
+                      @Override
+                      public ${dest_specialization}Stream apply(T t) {
+                          Chk${dest_specialization}Stream${_ThrowN}
+                              <${exc_list(extends=True)}>
+                                  subStream;
+                          try {
+                              subStream = mapper.apply(t);
+                          } catch (Exception e) {
+                              throw new ChkStreamWrappedException(e);
+                          }
+                          return subStream.toStream();
+                      }
+                  });
+          return new Chk${dest_specialization}Stream${_ThrowN}<${exc_list()}>(
+              ${''.join(['e%dClass,' % i for i in xrange(0, num_e)])}
+              newStream);
+    }
+    % endfor
+
     /**
      * Returns a stream consisting of the distinct elements (according to
      * {@link Object#equals(Object)}) of this stream.
@@ -400,7 +491,7 @@ public class ${class_name}<T${exc_decl_list}>
      * order is preserved.)  For unordered streams, no stability guarantees
      * are made.
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">stateful
+     * <p>This is a <a href="package-summary.html#StreamOps">stateful
      * intermediate operation</a>.
      *
      * @apiNote
@@ -418,7 +509,7 @@ public class ${class_name}<T${exc_decl_list}>
      *
      * @return the new stream
      */
-    public ${class_type('T')} distinct() {
+    public ${class_type()} distinct() {
         return fromStream(stream.distinct());
     }
 
@@ -431,12 +522,12 @@ public class ${class_name}<T${exc_decl_list}>
      * <p>For ordered streams, the sort is stable.  For unordered streams, no
      * stability guarantees are made.
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">stateful
+     * <p>This is a <a href="package-summary.html#StreamOps">stateful
      * intermediate operation</a>.
      *
      * @return the new stream
      */
-    public ${class_type('T')} sorted() {
+    public ${class_type()} sorted() {
         return fromStream(stream.sorted());
     }
 
@@ -447,15 +538,15 @@ public class ${class_name}<T${exc_decl_list}>
      * <p>For ordered streams, the sort is stable.  For unordered streams, no
      * stability guarantees are made.
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">stateful
+     * <p>This is a <a href="package-summary.html#StreamOps">stateful
      * intermediate operation</a>.
      *
-     * @param comparator a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#NonInterference">non-interfering</a>,
-     *                   <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Statelessness">stateless</a>
+     * @param comparator a <a href="package-summary.html#NonInterference">non-interfering</a>,
+     *                   <a href="package-summary.html#Statelessness">stateless</a>
      *                   {@code Comparator} to be used to compare stream elements
      * @return the new stream
      */
-    public ${class_type('T')} sorted(Comparator<? super T> comparator) {
+    public ${class_type()} sorted(Comparator<? super T> comparator) {
         return fromStream(stream.sorted(comparator));
     }
 
@@ -464,7 +555,7 @@ public class ${class_name}<T${exc_decl_list}>
      * performing the provided action on each element as elements are consumed
      * from the resulting stream.
      *
-     * <p>This is an <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">intermediate
+     * <p>This is an <a href="package-summary.html#StreamOps">intermediate
      * operation</a>.
      *
      * <p>For parallel stream pipelines, the action may be called at
@@ -483,33 +574,24 @@ public class ${class_name}<T${exc_decl_list}>
      *         .collect(Collectors.toList());
      * }</pre>
      *
-     * @param action a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#NonInterference">
+     * @param action a <a href="package-summary.html#NonInterference">
      *                 non-interfering</a> action to perform on the elements as
      *                 they are consumed from the stream
      * @return the new stream
      */
-    public ${class_type('T')} peek(
-        final ChkConsumer_Throw${num_e}
-            <? super T${exc_extend_list}>
+    public ${class_type()} peek(
+        final ChkConsumer${_ThrowN}
+            <? super T, ${exc_list(extends=True)}>
                 action) {
-        return fromStream(stream.peek(
-            new Consumer<T>() {
-                @Override
-                public void accept(T t) {
-                    try {
-                        action.accept(t);
-                    } catch (Exception e) {
-                        throw new ChkStreamWrappedException(e);
-                    }
-                }
-            }));
+        return fromStream(
+            stream.peek(functionUtils.wrapChkConsumer(action)));
     }
 
     /**
      * Returns a stream consisting of the elements of this stream, truncated
      * to be no longer than {@code maxSize} in length.
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">short-circuiting
+     * <p>This is a <a href="package-summary.html#StreamOps">short-circuiting
      * stateful intermediate operation</a>.
      *
      * @apiNote
@@ -530,7 +612,7 @@ public class ${class_name}<T${exc_decl_list}>
      * @return the new stream
      * @throws IllegalArgumentException if {@code maxSize} is negative
      */
-    public ${class_type('T')} limit(long maxSize) {
+    public ${class_type()} limit(long maxSize) {
         return fromStream(stream.limit(maxSize));
     }
 
@@ -540,7 +622,7 @@ public class ${class_name}<T${exc_decl_list}>
      * If this stream contains fewer than {@code n} elements then an
      * empty stream will be returned.
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">stateful
+     * <p>This is a <a href="package-summary.html#StreamOps">stateful
      * intermediate operation</a>.
      *
      * @apiNote
@@ -561,14 +643,14 @@ public class ${class_name}<T${exc_decl_list}>
      * @return the new stream
      * @throws IllegalArgumentException if {@code n} is negative
      */
-    public ${class_type('T')} skip(long n) {
+    public ${class_type()} skip(long n) {
         return fromStream(stream.skip(n));
     }
 
     /**
      * Performs an action for each element of this stream.
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">terminal
+     * <p>This is a <a href="package-summary.html#StreamOps">terminal
      * operation</a>.
      *
      * <p>The behavior of this operation is explicitly nondeterministic.
@@ -579,23 +661,15 @@ public class ${class_name}<T${exc_decl_list}>
      * library chooses.  If the action accesses shared state, it is
      * responsible for providing the required synchronization.
      *
-     * @param action a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#NonInterference">
+     * @param action a <a href="package-summary.html#NonInterference">
      *               non-interfering</a> action to perform on the elements
      */
     public void forEach(
-        final ChkConsumer_Throw${num_e}<? super T${exc_extend_list}>
-            action) ${throws_list} {
+        final ChkConsumer${_ThrowN}
+            <? super T, ${exc_list(extends=True)}>
+                action) ${throws_list} {
         try {
-          stream.forEach(new Consumer<T>() {
-              @Override
-              public void accept(T t) {
-                  try {
-                      action.accept(t);
-                  } catch (Exception e) {
-                      throw new ChkStreamWrappedException(e);
-                  }
-              }
-          });
+            stream.forEach(functionUtils.wrapChkConsumer(action));
       } catch (ChkStreamWrappedException e) {
           rethrowException(e);
       }
@@ -605,7 +679,7 @@ public class ${class_name}<T${exc_decl_list}>
      * Performs an action for each element of this stream, in the encounter
      * order of the stream if the stream has a defined encounter order.
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">terminal
+     * <p>This is a <a href="package-summary.html#StreamOps">terminal
      * operation</a>.
      *
      * <p>This operation processes the elements one at a time, in encounter
@@ -614,24 +688,16 @@ public class ${class_name}<T${exc_decl_list}>
      * performing the action for subsequent elements, but for any given element,
      * the action may be performed in whatever thread the library chooses.
      *
-     * @param action a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#NonInterference">
+     * @param action a <a href="package-summary.html#NonInterference">
      *               non-interfering</a> action to perform on the elements
      * @see #forEach(Consumer)
      */
     public void forEachOrdered(
-        final ChkConsumer_Throw${num_e}<? super T${exc_extend_list}>
-            action) ${throws_list} {
+        final ChkConsumer${_ThrowN}
+            <? super T, ${exc_list(extends=True)}>
+                action) ${throws_list} {
         try {
-            stream.forEachOrdered(new Consumer<T>() {
-                @Override
-                public void accept(T t) {
-                    try {
-                        action.accept(t);
-                    } catch (Exception e) {
-                        throw new ChkStreamWrappedException(e);
-                    }
-                }
-            });
+            stream.forEachOrdered(functionUtils.wrapChkConsumer(action));
         } catch (ChkStreamWrappedException e) {
             rethrowException(e);
         }
@@ -640,7 +706,7 @@ public class ${class_name}<T${exc_decl_list}>
     /**
      * Returns an array containing the elements of this stream.
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">terminal
+     * <p>This is a <a href="package-summary.html#StreamOps">terminal
      * operation</a>.
      *
      * @return an array containing the elements of this stream
@@ -660,7 +726,7 @@ public class ${class_name}<T${exc_decl_list}>
      * well as any additional arrays that might be required for a partitioned
      * execution or for resizing.
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">terminal
+     * <p>This is a <a href="package-summary.html#StreamOps">terminal
      * operation</a>.
      *
      * @apiNote
@@ -691,9 +757,9 @@ public class ${class_name}<T${exc_decl_list}>
     }
 
     /**
-     * Performs a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Reduction">reduction</a> on the
+     * Performs a <a href="package-summary.html#Reduction">reduction</a> on the
      * elements of this stream, using the provided identity value and an
-     * <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Associativity">associative</a>
+     * <a href="package-summary.html#Associativity">associative</a>
      * accumulation function, and returns the reduced value.  This is equivalent
      * to:
      * <pre>{@code
@@ -709,9 +775,9 @@ public class ${class_name}<T${exc_decl_list}>
      * function. This means that for all {@code t},
      * {@code accumulator.apply(identity, t)} is equal to {@code t}.
      * The {@code accumulator} function must be an
-     * <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Associativity">associative</a> function.
+     * <a href="package-summary.html#Associativity">associative</a> function.
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">terminal
+     * <p>This is a <a href="package-summary.html#StreamOps">terminal
      * operation</a>.
      *
      * @apiNote Sum, min, max, average, and string concatenation are all special
@@ -733,9 +799,9 @@ public class ${class_name}<T${exc_decl_list}>
      * synchronization and with greatly reduced risk of data races.
      *
      * @param identity the identity value for the accumulating function
-     * @param accumulator an <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Associativity">associative</a>,
-     *                    <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#NonInterference">non-interfering</a>,
-     *                    <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Statelessness">stateless</a>
+     * @param accumulator an <a href="package-summary.html#Associativity">associative</a>,
+     *                    <a href="package-summary.html#NonInterference">non-interfering</a>,
+     *                    <a href="package-summary.html#Statelessness">stateless</a>
      *                    function for combining two values
      * @return the result of the reduction
      */
@@ -749,9 +815,9 @@ public class ${class_name}<T${exc_decl_list}>
     }
 
     /**
-     * Performs a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Reduction">reduction</a> on the
+     * Performs a <a href="package-summary.html#Reduction">reduction</a> on the
      * elements of this stream, using an
-     * <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Associativity">associative</a> accumulation
+     * <a href="package-summary.html#Associativity">associative</a> accumulation
      * function, and returns an {@code Optional} describing the reduced value,
      * if any. This is equivalent to:
      * <pre>{@code
@@ -771,14 +837,14 @@ public class ${class_name}<T${exc_decl_list}>
      * but is not constrained to execute sequentially.
      *
      * <p>The {@code accumulator} function must be an
-     * <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Associativity">associative</a> function.
+     * <a href="package-summary.html#Associativity">associative</a> function.
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">terminal
+     * <p>This is a <a href="package-summary.html#StreamOps">terminal
      * operation</a>.
      *
-     * @param accumulator an <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Associativity">associative</a>,
-     *                    <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#NonInterference">non-interfering</a>,
-     *                    <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Statelessness">stateless</a>
+     * @param accumulator an <a href="package-summary.html#Associativity">associative</a>,
+     *                    <a href="package-summary.html#NonInterference">non-interfering</a>,
+     *                    <a href="package-summary.html#Statelessness">stateless</a>
      *                    function for combining two values
      * @return an {@link Optional} describing the result of the reduction
      * @throws NullPointerException if the result of the reduction is null
@@ -796,7 +862,7 @@ public class ${class_name}<T${exc_decl_list}>
     }
 
     /**
-     * Performs a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Reduction">reduction</a> on the
+     * Performs a <a href="package-summary.html#Reduction">reduction</a> on the
      * elements of this stream, using the provided identity, accumulation and
      * combining functions.  This is equivalent to:
      * <pre>{@code
@@ -817,7 +883,7 @@ public class ${class_name}<T${exc_decl_list}>
      *     combiner.apply(u, accumulator.apply(identity, t)) == accumulator.apply(u, t)
      * }</pre>
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">terminal
+     * <p>This is a <a href="package-summary.html#StreamOps">terminal
      * operation</a>.
      *
      * @apiNote Many reductions using this form can be represented more simply
@@ -829,22 +895,23 @@ public class ${class_name}<T${exc_decl_list}>
      *
      * @param <U> The type of the result
      * @param identity the identity value for the combiner function
-     * @param accumulator an <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Associativity">associative</a>,
-     *                    <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#NonInterference">non-interfering</a>,
-     *                    <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Statelessness">stateless</a>
+     * @param accumulator an <a href="package-summary.html#Associativity">associative</a>,
+     *                    <a href="package-summary.html#NonInterference">non-interfering</a>,
+     *                    <a href="package-summary.html#Statelessness">stateless</a>
      *                    function for incorporating an additional element into a result
-     * @param combiner an <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Associativity">associative</a>,
-     *                    <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#NonInterference">non-interfering</a>,
-     *                    <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Statelessness">stateless</a>
+     * @param combiner an <a href="package-summary.html#Associativity">associative</a>,
+     *                    <a href="package-summary.html#NonInterference">non-interfering</a>,
+     *                    <a href="package-summary.html#Statelessness">stateless</a>
      *                    function for combining two values, which must be
      *                    compatible with the accumulator function
      * @return the result of the reduction
      * @see #reduce(BinaryOperator)
      * @see #reduce(Object, BinaryOperator)
      */
-    public <U> U reduce(U identity,
-                 BiFunction<U, ? super T, U> accumulator,
-                 BinaryOperator<U> combiner) ${throws_list} {
+    public <U> U reduce(
+        U identity,
+        BiFunction<U, ? super T, U> accumulator,
+        BinaryOperator<U> combiner) ${throws_list} {
         try {
             return stream.reduce(identity, accumulator, combiner);
         } catch (ChkStreamWrappedException e) {
@@ -854,7 +921,7 @@ public class ${class_name}<T${exc_decl_list}>
     }
 
     /**
-     * Performs a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#MutableReduction">mutable
+     * Performs a <a href="package-summary.html#MutableReduction">mutable
      * reduction</a> operation on the elements of this stream.  A mutable
      * reduction is one in which the reduced value is a mutable result container,
      * such as an {@code ArrayList}, and elements are incorporated by updating
@@ -870,7 +937,7 @@ public class ${class_name}<T${exc_decl_list}>
      * <p>Like {@link #reduce(Object, BinaryOperator)}, {@code collect} operations
      * can be parallelized without requiring additional synchronization.
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">terminal
+     * <p>This is a <a href="package-summary.html#StreamOps">terminal
      * operation</a>.
      *
      * @apiNote There are many existing classes in the JDK whose signatures are
@@ -893,20 +960,21 @@ public class ${class_name}<T${exc_decl_list}>
      * @param supplier a function that creates a new result container. For a
      *                 parallel execution, this function may be called
      *                 multiple times and must return a fresh value each time.
-     * @param accumulator an <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Associativity">associative</a>,
-     *                    <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#NonInterference">non-interfering</a>,
-     *                    <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Statelessness">stateless</a>
+     * @param accumulator an <a href="package-summary.html#Associativity">associative</a>,
+     *                    <a href="package-summary.html#NonInterference">non-interfering</a>,
+     *                    <a href="package-summary.html#Statelessness">stateless</a>
      *                    function for incorporating an additional element into a result
-     * @param combiner an <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Associativity">associative</a>,
-     *                    <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#NonInterference">non-interfering</a>,
-     *                    <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Statelessness">stateless</a>
+     * @param combiner an <a href="package-summary.html#Associativity">associative</a>,
+     *                    <a href="package-summary.html#NonInterference">non-interfering</a>,
+     *                    <a href="package-summary.html#Statelessness">stateless</a>
      *                    function for combining two values, which must be
      *                    compatible with the accumulator function
      * @return the result of the reduction
      */
-    public <R> R collect(Supplier<R> supplier,
-                  BiConsumer<R, ? super T> accumulator,
-                  BiConsumer<R, R> combiner) ${throws_list} {
+    public <R> R collect(
+        Supplier<R> supplier,
+        BiConsumer<R, ? super T> accumulator,
+        BiConsumer<R, R> combiner) ${throws_list} {
         try {
             return stream.collect(supplier, accumulator, combiner);
         } catch (ChkStreamWrappedException e) {
@@ -916,7 +984,7 @@ public class ${class_name}<T${exc_decl_list}>
     }
 
     /**
-     * Performs a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#MutableReduction">mutable
+     * Performs a <a href="package-summary.html#MutableReduction">mutable
      * reduction</a> operation on the elements of this stream using a
      * {@code Collector}.  A {@code Collector}
      * encapsulates the functions used as arguments to
@@ -931,7 +999,7 @@ public class ${class_name}<T${exc_decl_list}>
      * then a concurrent reduction will be performed (see {@link Collector} for
      * details on concurrent reduction.)
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">terminal
+     * <p>This is a <a href="package-summary.html#StreamOps">terminal
      * operation</a>.
      *
      * <p>When executed in parallel, multiple intermediate results may be
@@ -979,12 +1047,12 @@ public class ${class_name}<T${exc_decl_list}>
     /**
      * Returns the minimum element of this stream according to the provided
      * {@code Comparator}.  This is a special case of a
-     * <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Reduction">reduction</a>.
+     * <a href="package-summary.html#Reduction">reduction</a>.
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">terminal operation</a>.
+     * <p>This is a <a href="package-summary.html#StreamOps">terminal operation</a>.
      *
-     * @param comparator a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#NonInterference">non-interfering</a>,
-     *                   <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Statelessness">stateless</a>
+     * @param comparator a <a href="package-summary.html#NonInterference">non-interfering</a>,
+     *                   <a href="package-summary.html#Statelessness">stateless</a>
      *                   {@code Comparator} to compare elements of this stream
      * @return an {@code Optional} describing the minimum element of this stream,
      * or an empty {@code Optional} if the stream is empty
@@ -1002,13 +1070,13 @@ public class ${class_name}<T${exc_decl_list}>
     /**
      * Returns the maximum element of this stream according to the provided
      * {@code Comparator}.  This is a special case of a
-     * <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Reduction">reduction</a>.
+     * <a href="package-summary.html#Reduction">reduction</a>.
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">terminal
+     * <p>This is a <a href="package-summary.html#StreamOps">terminal
      * operation</a>.
      *
-     * @param comparator a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#NonInterference">non-interfering</a>,
-     *                   <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Statelessness">stateless</a>
+     * @param comparator a <a href="package-summary.html#NonInterference">non-interfering</a>,
+     *                   <a href="package-summary.html#Statelessness">stateless</a>
      *                   {@code Comparator} to compare elements of this stream
      * @return an {@code Optional} describing the maximum element of this stream,
      * or an empty {@code Optional} if the stream is empty
@@ -1025,13 +1093,13 @@ public class ${class_name}<T${exc_decl_list}>
 
     /**
      * Returns the count of elements in this stream.  This is a special case of
-     * a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Reduction">reduction</a> and is
+     * a <a href="package-summary.html#Reduction">reduction</a> and is
      * equivalent to:
      * <pre>{@code
      *     return mapToLong(e -> 1L).sum();
      * }</pre>
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">terminal operation</a>.
+     * <p>This is a <a href="package-summary.html#StreamOps">terminal operation</a>.
      *
      * @return the count of elements in this stream
      */
@@ -1050,34 +1118,25 @@ public class ${class_name}<T${exc_decl_list}>
      * necessary for determining the result.  If the stream is empty then
      * {@code false} is returned and the predicate is not evaluated.
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">short-circuiting
+     * <p>This is a <a href="package-summary.html#StreamOps">short-circuiting
      * terminal operation</a>.
      *
      * @apiNote
      * This method evaluates the <em>existential quantification</em> of the
      * predicate over the elements of the stream (for some x P(x)).
      *
-     * @param predicate a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#NonInterference">non-interfering</a>,
-     *                  <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Statelessness">stateless</a>
+     * @param predicate a <a href="package-summary.html#NonInterference">non-interfering</a>,
+     *                  <a href="package-summary.html#Statelessness">stateless</a>
      *                  predicate to apply to elements of this stream
      * @return {@code true} if any elements of the stream match the provided
      * predicate, otherwise {@code false}
      */
     public boolean anyMatch(
-        final ChkPredicate_Throw${num_e}<? super T${exc_extend_list}>
-            predicate) ${throws_list} {
+        final ChkPredicate${_ThrowN}
+            <? super T, ${exc_list(extends=True)}>
+                predicate) ${throws_list} {
         try {
-            return stream.anyMatch(
-                new Predicate<T>() {
-                    @Override
-                    public boolean test(T t) {
-                        try {
-                            return predicate.test(t);
-                        } catch (Exception e) {
-                            throw new ChkStreamWrappedException(e);
-                        }
-                    }
-                });
+            return stream.anyMatch(functionUtils.wrapChkPredicate(predicate));
         } catch (ChkStreamWrappedException e) {
             rethrowException(e);
             return false;
@@ -1090,7 +1149,7 @@ public class ${class_name}<T${exc_decl_list}>
      * determining the result.  If the stream is empty then {@code true} is
      * returned and the predicate is not evaluated.
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">short-circuiting
+     * <p>This is a <a href="package-summary.html#StreamOps">short-circuiting
      * terminal operation</a>.
      *
      * @apiNote
@@ -1099,27 +1158,18 @@ public class ${class_name}<T${exc_decl_list}>
      * stream is empty, the quantification is said to be <em>vacuously
      * satisfied</em> and is always {@code true} (regardless of P(x)).
      *
-     * @param predicate a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#NonInterference">non-interfering</a>,
-     *                  <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Statelessness">stateless</a>
+     * @param predicate a <a href="package-summary.html#NonInterference">non-interfering</a>,
+     *                  <a href="package-summary.html#Statelessness">stateless</a>
      *                  predicate to apply to elements of this stream
      * @return {@code true} if either all elements of the stream match the
      * provided predicate or the stream is empty, otherwise {@code false}
      */
     public boolean allMatch(
-        final ChkPredicate_Throw${num_e}<? super T${exc_extend_list}>
-            predicate) ${throws_list} {
+        final ChkPredicate${_ThrowN}
+            <? super T, ${exc_list(extends=True)}>
+                predicate) ${throws_list} {
         try {
-            return stream.allMatch(
-                new Predicate<T>() {
-                    @Override
-                    public boolean test(T t) {
-                        try {
-                            return predicate.test(t);
-                        } catch (Exception e) {
-                            throw new ChkStreamWrappedException(e);
-                        }
-                    }
-                });
+            return stream.allMatch(functionUtils.wrapChkPredicate(predicate));
         } catch (ChkStreamWrappedException e) {
             rethrowException(e);
             return false;
@@ -1132,7 +1182,7 @@ public class ${class_name}<T${exc_decl_list}>
      * determining the result.  If the stream is empty then {@code true} is
      * returned and the predicate is not evaluated.
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">short-circuiting
+     * <p>This is a <a href="package-summary.html#StreamOps">short-circuiting
      * terminal operation</a>.
      *
      * @apiNote
@@ -1141,27 +1191,18 @@ public class ${class_name}<T${exc_decl_list}>
      * the stream is empty, the quantification is said to be vacuously satisfied
      * and is always {@code true}, regardless of P(x).
      *
-     * @param predicate a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#NonInterference">non-interfering</a>,
-     *                  <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#Statelessness">stateless</a>
+     * @param predicate a <a href="package-summary.html#NonInterference">non-interfering</a>,
+     *                  <a href="package-summary.html#Statelessness">stateless</a>
      *                  predicate to apply to elements of this stream
      * @return {@code true} if either no elements of the stream match the
      * provided predicate or the stream is empty, otherwise {@code false}
      */
     public boolean noneMatch(
-        final ChkPredicate_Throw${num_e}<? super T${exc_extend_list}>
-            predicate) ${throws_list} {
+        final ChkPredicate${_ThrowN}
+            <? super T, ${exc_list(extends=True)}>
+                predicate) ${throws_list} {
         try {
-            return stream.noneMatch(
-                new Predicate<T>() {
-                    @Override
-                    public boolean test(T t) {
-                        try {
-                            return predicate.test(t);
-                        } catch (Exception e) {
-                            throw new ChkStreamWrappedException(e);
-                        }
-                    }
-                });
+            return stream.noneMatch(functionUtils.wrapChkPredicate(predicate));
         } catch (ChkStreamWrappedException e) {
             rethrowException(e);
             return false;
@@ -1173,7 +1214,7 @@ public class ${class_name}<T${exc_decl_list}>
      * or an empty {@code Optional} if the stream is empty.  If the stream has
      * no encounter order, then any element may be returned.
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">short-circuiting
+     * <p>This is a <a href="package-summary.html#StreamOps">short-circuiting
      * terminal operation</a>.
      *
      * @return an {@code Optional} describing the first element of this stream,
@@ -1193,7 +1234,7 @@ public class ${class_name}<T${exc_decl_list}>
      * Returns an {@link Optional} describing some element of the stream, or an
      * empty {@code Optional} if the stream is empty.
      *
-     * <p>This is a <a href="https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#StreamOps">short-circuiting
+     * <p>This is a <a href="package-summary.html#StreamOps">short-circuiting
      * terminal operation</a>.
      *
      * <p>The behavior of this operation is explicitly nondeterministic; it is
@@ -1236,11 +1277,11 @@ public class ${class_name}<T${exc_decl_list}>
      * @param b the second stream
      * @return the concatenation of the two input streams
      */
-    public ${class_type('T')} concat(Stream<? extends T> b) {
+    public ${class_type()} concat(Stream<? extends T> b) {
         Stream<T> concatStream =
-            ${'Stream' if flavour == 'java8' else 'RefStreams'}
+            ${'Stream' if stream_impl == 'java8' else 'RefStreams'}
                 .concat(toStream(), b);
-        return new ${class_name}<T${exc_use_list}>(
+        return new ${class_type()}(
             ${', '.join(['e%dClass' % i for i in xrange(0, num_e)])},
             concatStream);
     }
@@ -1249,8 +1290,8 @@ public class ${class_name}<T${exc_decl_list}>
      * Like {@link #concat(Stream)}, except that the stream to be concatenated
      * is a {@link ChkStream} of the same generic type.
      */
-    public ${class_type('T')} concat(
-        ${class_name}<? extends T${exc_extend_list}> b) {
+    public ${class_type()} concat(
+        ${class_type('? extends T', extends=True)} b) {
         return concat(b.toStream());
     }
 
@@ -1259,8 +1300,9 @@ public class ${class_name}<T${exc_decl_list}>
     % if num_e != MAX_EXCEPTIONS:
     <%
       next_class_type = (
-          'ChkStream_Throw%d<T%s>' % (
-              num_e + 1, ','.join([exc_use_list, 'NewE'])))
+          'ChkStream_Throw%d<T, %s>' % (
+              num_e + 1,
+              ', '.join(['E%d' % i for i in xrange(0, num_e)] + ['NewE'])))
     %>
     /**
      * Returns a stream consisting of the elements of this stream, but where the
@@ -1297,7 +1339,7 @@ public class ${class_name}<T${exc_decl_list}>
     // Private methods.
 
     private <R> ${class_type('R')} fromStream(Stream<R> stream) {
-        return new ${class_name}<R${exc_use_list}>(
+        return new ${class_type('R')}(
             ${''.join(['e%dClass,' % i for i in xrange(0, num_e)])}
             stream);
     }
