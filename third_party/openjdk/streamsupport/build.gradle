@@ -1,6 +1,6 @@
 buildscript {
   repositories {
-    mavenCentral()
+    jcenter()
   }
 
   dependencies {
@@ -8,22 +8,13 @@ buildscript {
   }
 }
 
-apply plugin: 'java'
+apply plugin: 'java-library'
+apply plugin: 'maven-publish'
 
 sourceSets {
   main {
     java.srcDir file('src/main/generated')
   }
-}
-
-dependencies {
-  compile project(':third_party:openjdk:common')
-
-  compileOnly group: 'net.sourceforge.streamsupport', name: 'streamsupport', version: '1.5.4'
-
-  testCompile group: 'com.google.truth', name: 'truth', version: '0.32'
-  testCompile group: 'junit', name: 'junit', version: '4.11'
-  testCompile group: 'net.sourceforge.streamsupport', name: 'streamsupport', version: '1.5.4'
 }
 
 testClasses {
@@ -38,4 +29,24 @@ compileJava {
 compileTestJava {
   sourceCompatibility = 1.8
   targetCompatibility = 1.8
+}
+
+dependencies {
+  api project(':third_party:openjdk:common')
+  api group: 'net.sourceforge.streamsupport', name: 'streamsupport', version: '1.5.4'
+
+  testImplementation group: 'com.google.truth', name: 'truth', version: '0.32'
+  testImplementation group: 'junit', name: 'junit', version: '4.11'
+}
+
+publishing {
+  publications {
+    maven(MavenPublication) {
+      groupId 'com.google.chkstream'
+      artifactId 'chkstream-streamsupport'
+      version '1.0.0-SNAPSHOT'
+
+      from components.java
+    }
+  }
 }
